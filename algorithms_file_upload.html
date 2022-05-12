@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+  <meta charset="utf-8">
+  <title>Production Scheduling</title>
+  <style media="screen">
+    table,
+    th,
+    td {
+      border: 1px solid black;
+      border-collapse: collapse;
+      padding: 5px;
+    }
+  </style>
+</head>
+
+<body>
+  <input type="file" name="inputfile" id="inputfile">
+  <br><br>
+  <table>
+    <tr>
+      <td><b>Number of Jobs</b></td>
+      <td><b>Number of Machines</b></td>
+    </tr>
+    <tr>
+      <td id="jobsNo"></td>
+      <td id="machinesNo"></td>
+    </tr>
+  </table>
+  <br><br>
+  <button onclick="hideTable()">Hide table</button>
+  <br><br>
+
+  <table id="data-table">
+  </table>
+  <br>
+  <br>
+
+  <table>
+    <tr>
+      <th>Heuristic</th>
+      <th>Final Sequence</th>
+      <th>Time</th>
+    </tr>
+    <tr>
+      <td>Greedy Heuristic</td>
+      <td id="greedy"></td>
+      <td id="greedy_time"></td>
+    </tr>
+    <tr>
+      <td>Minumum Flow Time</td>
+      <td id="minimumFlowTime"></td>
+      <td id="minimumFlowTime_time"></td>
+    </tr>
+    <tr>
+      <td>Johnson Rule Adapted</td>
+      <td id="jr"></td>
+      <td id="jr_time"></td>
+    </tr>
+    <tr>
+      <td>Palmers Heuristic</td>
+      <td id="palmers"></td>
+      <td id="palmers_time"></td>
+    </tr>
+    <tr>
+      <td>CDS Heuristic</td>
+      <td id="cds"></td>
+      <td id="cds_time"></td>
+    </tr>
+    <tr>
+      <td>NEH Heuristic</td>
+      <td id="neh"></td>
+      <td id="neh_time"></td>
+
+    </tr>
+    <!-- <tr>
+      <td>Branch and Bound</td>
+      <td id="branchBound"></td>
+      <td id="branchBound_time"></td>
+
+    </tr> -->
+  </table>
+
+</body>
+<script type="text/javascript">
+  var obj = {};
+  var isFileLoaded = false;
+  var jobsNo = 0;
+  var machinesNo = 0;
+  var table_visible = true;
+
+  document.getElementById('inputfile')
+    .addEventListener('change', function() {
+
+      var fr = new FileReader();
+      fr.onload = function() {
+        obj = {};
+        var jobs = fr.result.split("\n");
+        let jobs_counter = 0;
+        for (let i = 0; i < jobs.length; i++) {
+          let jobs_aux = jobs[i].split("  ");
+          if (jobs_aux.length != 1 && i != jobs.length - 1) {
+            let obj_aux = {};
+            machinesNo = jobs_aux.length / 2;
+            jobs_counter++;
+            for (let j = 0; j < jobs_aux.length; j = j + 2) {
+
+              obj_aux[j / 2] = parseInt(jobs_aux[j + 1]);
+
+            }
+            obj[i] = obj_aux;
+          }
+
+        }
+        jobsNo = jobs_counter;
+
+        document.getElementById("jobsNo").innerHTML = jobsNo;
+        document.getElementById("machinesNo").innerHTML = machinesNo;
+        drawTable(obj)
+        isFileLoaded = true;
+      }
+
+      fr.readAsText(this.files[0]);
+    });
+
+  function drawTable(objecto) {
+    var table = document.getElementById("data-table");
+
+    // Create an empty <tr> element and add it to the 1st position of the table:
+    var row = table.insertRow(0);
+
+    //draw headers
+    var cell1 = row.insertCell(0);
+    for (let i = 0; i < machinesNo; i++) {
+      let cell = row.insertCell(i + 1);
+      i_aux = i + 1;
+      cell.innerHTML = "<b>" + "M" + i_aux + "</b";
+    }
+
+    for (let i = 0; i < jobsNo; i++) {
+      let row_aux = table.insertRow(table.rows.length);
+      let cell = row_aux.insertCell(0);
+      i_aux = i + 1;
+      cell.innerHTML = "<b>" + i_aux + "</b>";
+      for (let j = 0; j < machinesNo; j++) {
+        let cell_aux = row_aux.insertCell(j + 1);
+        cell_aux.innerHTML = objecto[i][j];
+      }
+    }
+
+    drawScores();
+  }
+
+  function drawScores() {
+
+    let greedy_sequence = greedy(jobsNo, machinesNo);
+    document.getElementById("greedy").innerHTML = drawArray(greedy_sequence);
+    document.getElementById("greedy_time").innerHTML = calculateTimeGeneral(greedy_sequence, machinesNo, jobsNo);
+
+
+    document.getElementById("minimumFlowTime").innerHTML = drawArray(meanFlowTime(jobsNo, machinesNo));
+    document.getElementById("minimumFlowTime_time").innerHTML = calculateTimeGeneral(meanFlowTime(jobsNo, machinesNo), machinesNo, jobsNo);
+
+    document.getElementById("jr").innerHTML = drawArray(johnsonHeuristic(jobsNo, machinesNo));
+    document.getElementById("jr_time").innerHTML = calculateTimeGeneral(johnsonHeuristic(jobsNo, machinesNo), machinesNo, jobsNo);
+
+    document.getElementById("palmers").innerHTML = drawArray(palmersHeuristic(jobsNo, machinesNo));
+    document.getElementById("palmers_time").innerHTML = calculateTimeGeneral(palmersHeuristic(jobsNo, machinesNo), machinesNo, jobsNo);
+
+    document.getElementById("cds").innerHTML = drawArray(CDSalgorithm(jobsNo, machinesNo));
+    document.getElementById("cds_time").innerHTML = calculateTimeGeneral(CDSalgorithm(jobsNo, machinesNo), machinesNo, jobsNo);
+
+    document.getElementById("neh").innerHTML = drawArray(NEHalgorithm(jobsNo, machinesNo));
+    document.getElementById("neh_time").innerHTML = calculateTimeGeneral(NEHalgorithm(jobsNo, machinesNo), machinesNo, jobsNo);
+
+    // let bb_sequence = branchBound(jobsNo, machinesNo);
+    // document.getElementById("branchBound").innerHTML = bb_sequence;
+    // document.getElementById("branchBound_time").innerHTML = calculateTimeGeneral(bb_sequence, machinesNo, jobsNo);
+
+  }
+ function drawArray(array){
+   let string = "";
+   for(let i=0;  i<array.length; i++)
+   {
+     string += array[i] + 1;
+     if(i != array.length - 1)
+     string += ", ";
+
+   }
+   return string;
+
+ }
+  function hideTable() {
+    if (table_visible) {
+      document.getElementById("data-table").style.display = "none";
+      table_visible = false;
+    } else {
+      document.getElementById("data-table").style.display = "block";
+      table_visible = true;
+
+    }
+  }
+
+  function greedy(jobsNo, machinesNo) {
+    var array_aux = [];
+    for (let i = 0; i < jobsNo; i++) {
+      array_aux.push({
+        value: obj[i][0],
+        job: i
+      });
+    }
+    array_aux.sort(function(a, b) {
+      return a['value'] - b['value']
+    });
+
+    var final_sequence = [];
+
+    for (let i = 0; i < jobsNo; i++) {
+      final_sequence[i] = array_aux[i].job;
+    }
+
+
+    return final_sequence;
+  }
+
+  function meanFlowTime(jobsNo, machinesNo) {
+    var mean_flow_time = [];
+    var mean_flow_time_array_aux = [];
+
+    for (let i = 0; i < jobsNo; i++) {
+      var mean_flow_time_aux = 0;
+
+      for (let j = 0; j < machinesNo; j++) {
+        mean_flow_time_aux += obj[i][j];
+      }
+
+      mean_flow_time[i] = mean_flow_time_aux / 10;
+      mean_flow_time_array_aux[i] = mean_flow_time_aux / 10;
+
+    }
+
+    var sorted_mean_time = mean_flow_time_array_aux.sort();
+
+    var final_sequence = [];
+
+
+    for (let i = 0; i < sorted_mean_time.length; i++) {
+
+      for (let j = 0; j < mean_flow_time.length; j++) {
+        if (sorted_mean_time[i] == mean_flow_time[j]) {
+          final_sequence.push(j);
+
+          break;
+        }
+      }
+
+    }
+    return final_sequence;
+  }
+
+  //Johnson Rule adapted (x - sum of 3 machines | Y - last 2 machines)
+  function johnsonHeuristic(jobsNo, machinesNo) {
+    var array_aux = [];
+    var sum_aux_x = 0;
+    var sum_aux_y = 0;
+    var m_a = machinesNo;
+    var m_b = Math.floor(machinesNo / 2) + machinesNo % 2
+
+    for (let i = 0; i < jobsNo; i++) {
+
+
+      for (let j = 0; j < m_b; j++) {
+        sum_aux_x += obj[i][j];
+      }
+
+      for (let j = m_b; j < m_a; j++) {
+        sum_aux_y += obj[i][j];
+      }
+
+      array_aux.push({
+        sum: sum_aux_x,
+        variable: 'x',
+        job: i
+      });
+      array_aux.push({
+        sum: sum_aux_y,
+        variable: 'y',
+        job: i
+      });
+
+      sum_aux_x = 0;
+      sum_aux_y = 0;
+
+    }
+
+    //sort array by the sum
+    array_aux.sort(function(a, b) {
+      return a['sum'] - b['sum']
+    });
+
+    var final_sequence = [];
+    var jobsAdded_x = 0;
+    var jobsAdded_y = 0;
+
+    for (let i = 0; i < jobsNo * 2; i++) {
+      if (!final_sequence.includes(array_aux[i].job) && array_aux[i].variable == 'x') {
+        final_sequence[jobsAdded_x] = array_aux[i].job;
+        jobsAdded_x++;
+      } else if (!final_sequence.includes(array_aux[i].job) && array_aux[i].variable == 'y') {
+        final_sequence[jobsNo - 1 - jobsAdded_y] = array_aux[i].job;
+        jobsAdded_y++;
+      }
+    }
+    return final_sequence;
+  }
+
+  //Palmers Algortihm
+  function palmersHeuristic(jobsNo, machinesNo) {
+    var weigths = [];
+    for (let i = 1; i <= machinesNo; i++) {
+      let aux = machinesNo - (2 * i - 1);
+      weigths.push(aux);
+    }
+
+    var palmers_calculations = [];
+
+    for (let i = 0; i < jobsNo; i++) {
+      var aux = 0;
+      for (let j = 0; j < machinesNo; j++) {
+        aux += weigths[j] * obj[i][j];
+      }
+      palmers_calculations.push({
+        sum: -aux,
+        job: i
+      });
+    }
+
+    var final_sequence = [];
+
+    palmers_calculations.sort(function(a, b) {
+      return b['sum'] - a['sum'];
+    });
+
+
+    for (let i = 0; i < palmers_calculations.length; i++) {
+      final_sequence[i] = palmers_calculations[i].job
+    }
+
+    // console.log(final_sequence);
+    return final_sequence;
+  }
+
+
+  // //CDS Algorithm
+  function CDSalgorithm(jobsNo, machinesNo) {
+
+
+    var final_sequences = [];
+    for(let k =0; k<machinesNo -1; k++){
+      var array_aux = [];
+
+    for (let i = 0; i < jobsNo; i++) {
+      var sum_aux_x = 0;
+      var sum_aux_y = 0;
+
+      for (let j = 0; j <= k; j++) {
+        sum_aux_x += obj[i][j];
+
+      }
+      for (let j = machinesNo - k -1; j < machinesNo ; j++) {
+        sum_aux_y += obj[i][j];
+
+      }
+      array_aux.push({
+        sum: sum_aux_x,
+        variable: 'x',
+        job: i
+      });
+      array_aux.push({
+        sum: sum_aux_y,
+        variable: 'y',
+        job: i
+      });
+
+    }
+
+    //sort array by the sum
+    array_aux.sort(function(a, b) {
+      return a['sum'] - b['sum']
+    });
+    // console.log(array_aux);
+
+    var final_sequence = [];
+    var jobsAdded_x = 0;
+    var jobsAdded_y = 0;
+    for (let i = 0; i < jobsNo * 2; i++) {
+      if (!final_sequence.includes(array_aux[i].job) && array_aux[i].variable == 'x') {
+        final_sequence[jobsAdded_x] = array_aux[i].job;
+        jobsAdded_x++;
+      } else if (!final_sequence.includes(array_aux[i].job) && array_aux[i].variable == 'y') {
+        final_sequence[jobsNo - 1 - jobsAdded_y] = array_aux[i].job;
+        jobsAdded_y++;
+      }
+      }
+      final_sequences.push(Array.from(final_sequence));
+    }
+    let final_results = [];
+    for(let i=0; i < final_sequences.length; i++){
+      final_results.push({i: i, result: calculateTimeGeneral(final_sequences[i], machinesNo, jobsNo)});
+    }
+    final_results.sort(function(a, b) {
+      return a['result'] - b['result'];
+    });
+
+    console.log(final_results);
+    return final_sequences[final_results[0].i];
+  }
+
+  function NEHalgorithm(jobsNo, machinesNo) {
+    // NEH
+    var array_aux = [];
+
+    for (let i = 0; i < jobsNo; i++) {
+      var time_of_job = 0;
+      for (let j = 0; j < machinesNo; j++) {
+
+        time_of_job += obj[i][j];
+
+      }
+      array_aux.push({
+        job: i,
+        sum: time_of_job
+      });
+
+    }
+    // //sort array by the sum decreasing
+    array_aux.sort(function(a, b) {
+      return b['sum'] - a['sum']
+    });
+
+
+    var sequence_temp = [];
+    sequence_temp = [array_aux[0].job, array_aux[1].job];
+
+    for (let i = 2; i < jobsNo; i++) {
+      var calculations = [];
+      for (let j = 0; j < i + 1; j++) {
+        let temp_array = Array.from(sequence_temp);
+        temp_array.splice(j, 0, array_aux[i].job);
+
+        calculations[j] = {
+          position: j,
+          time: calculateTimeGeneral(temp_array, machinesNo, i + 1),
+          final_sequence: temp_array
+        };
+      }
+
+      calculations.sort(function(a, b) {
+        return a['time'] - b['time']
+      });
+
+      sequence_temp = Array.from(calculations[0].final_sequence);
+
+    }
+
+    // console.log( "Sequencia final : " );
+    // console.log(sequence_temp);
+    // console.log(calculateTimeGeneral(sequence_temp, machinesNo, jobsNo));
+
+    return sequence_temp;
+  }
+
+
+function branchBound(jobsNo, machinesNo){
+  var array_aux = [];
+  var iteration = 0;
+  var nodes = [];
+
+  while (true) {
+
+    if (iteration > 0) {
+      let nodes_aux = [];
+
+      for (let j = 0; j < nodes.length; j++) {
+        for (let k = 0; k < jobsNo; k++) {
+          if (!nodes[j].jobs.includes(k)) {
+            let sequence_node = [];
+            sequence_node = Array.from(nodes[j].jobs);
+            sequence_node.push(k);
+            nodes_aux.push({
+              jobs: sequence_node,
+              lower_bond: 0
+            });
+
+          }
+        }
+      }
+      nodes = nodes_aux;
+      console.log(JSON.parse(JSON.stringify(nodes)));
+    } else {
+      for (let j = 0; j < jobsNo; j++) {
+        nodes.push({
+          jobs: [j],
+          lower_bond: 0
+        });
+
+      }
+
+
+    }
+
+    for (let i = 0; i < nodes.length ; i++) {
+      let min = [];
+      let calculations = [];
+      for (let j = 0; j < machinesNo; j++) {
+
+        var temp = 0;
+        temp = calculateC(nodes[i].jobs, j, jobsNo, machinesNo);
+        calculations.push(temp);
+        if (j != 0) {
+
+          min.push(totalRemainingTime(nodes[i].jobs, j, jobsNo, machinesNo).sort(function(a, b) {
+            return a - b;
+          })[0]);
+        }
+
+      }
+
+      let aux = [];
+
+      for (let j = 0; j < machinesNo; j++) {
+        let a = calculations[j] + totalTimeJob(nodes[i].jobs, j, jobsNo);
+        if (j < min.length) {
+
+          a += min[j];
+        }
+        aux.push(a);
+      }
+
+
+      aux.sort(function(a, b) {
+        return a - b;
+      });
+
+      console.log("bound array: ");
+      console.log(JSON.parse(JSON.stringify(aux)))
+
+      nodes[i].lower_bond = aux[aux.length - 1];
+    }
+
+    nodes.sort(function(a, b) {
+      return a['lower_bond'] - b['lower_bond'];
+    });
+    console.log("after sorting: ");
+    console.log(JSON.parse(JSON.stringify(nodes)));
+
+    let nodes_aux = [];
+    for (let j = 0; j < nodes.length; j++) {
+      if (nodes_aux.length == 0)
+        nodes_aux[0] = nodes[j];
+      else if (nodes_aux.filter(e => e.lower_bond == nodes[j].lower_bond).length > 0) {
+        nodes_aux.push(nodes[j]);
+      } else {
+        break;
+      }
+    }
+    nodes = nodes_aux;
+
+    console.log("nodes final: ");
+    console.log(JSON.parse(JSON.stringify(nodes)));
+    iteration++;
+
+    if(nodes[0].jobs.length == jobsNo){
+      console.log("Optimal solution");
+      console.log(JSON.parse(JSON.stringify(nodes[0].jobs)));
+      return nodes[0].jobs;
+    }
+  }
+}
+
+  function calculateC(sequence, machine, jobsNo, machinesNo) {
+
+    let arrival_time = [];
+    let finish_time = [];
+
+    for (let i = 0; i <= machine; i++) {
+      arrival_time[i] = 0;
+      finish_time[i] = 0;
+    }
+
+    for (let i = 0; i < sequence.length; i++) {
+      arrival_time[0] = finish_time[0];
+      for (let j = 0; j <= machine; j++) {
+
+        if (j == 0) {
+
+          finish_time[j] += obj[sequence[i]][j];
+          arrival_time[j + 1] = finish_time[j];
+
+        } else if (j == machinesNo - 1) {
+
+          if (finish_time[j] >= arrival_time[j]) {
+            arrival_time[j] = finish_time[j];
+          }
+
+          finish_time[j] = obj[sequence[i]][j] + arrival_time[j];
+
+        } else {
+
+          if (finish_time[j] >= arrival_time[j]) {
+            arrival_time[j] = finish_time[j];
+          }
+
+          finish_time[j] = obj[sequence[i]][j] + arrival_time[j];
+          arrival_time[j + 1] = finish_time[j];
+        }
+      }
+
+    }
+
+    return finish_time[finish_time.length - 1];
+  }
+
+  function totalTimeJob(jobs_sequence, machine, jobsNo) {
+
+    let p = 0;
+    for (let i = 0; i < jobsNo; i++) {
+
+      if (!jobs_sequence.includes(i)) {
+        p += obj[i][machine];
+      }
+    }
+
+    return p;
+  }
+
+  function totalRemainingTime(jobs_sequence, machine, jobsNo, machinesNo) {
+
+    let p = 0;
+    let aux = [];
+
+    for (let i = 0; i < jobsNo; i++) {
+      if (!jobs_sequence.includes(i)) {
+        for (let j = machine; j < machinesNo; j++) {
+          p += obj[i][j];
+          // console.log("i _: " + i);
+        }
+        aux.push(p);
+      }
+      p = 0;
+    }
+
+    return aux;
+  }
+
+
+  //var final_sequence = [0, 9, 5, 2, 1, 4, 6, 7, 8, 3]; //sequence johnson adapted x- m1,m2,m3 | y - m4, m5 -> best so far
+  //var final_sequence = [6,7,0,9,2,5,1,4,8,3]; //sequence johnson adapted x- m1,m2 | y - m3, m4, m5
+
+  // var final_sequence = [3,4,0,6,7,8,9,2,1,5]; // organized max minimum job first - > disapontment
+  //
+  // var final_sequence = [5,1,2,9,8,7,6,0,4,3] ; // organized - long jobs first -> pior que a anterior -->
+
+  //  console.log(calculatTime(final_sequence));
+  //console.log(calculatTimeGeneral(final_sequence, 5, 10));
+
+  function calculateTimeGeneral(final_sequence, machinesNo, jobsNo) {
+
+    var arrival_time = [];
+    var finish_time = [];
+    for (let i = 0; i < machinesNo; i++) {
+      arrival_time[i] = 0;
+      finish_time[i] = 0;
+    }
+
+    for (let i = 0; i < jobsNo; i++) {
+      arrival_time[0] = finish_time[0];
+      for (let j = 0; j < machinesNo; j++) {
+
+        if (j == 0) {
+
+          finish_time[j] += obj[final_sequence[i]][j];
+          arrival_time[j + 1] = finish_time[j];
+
+        } else if (j == machinesNo - 1) {
+
+          if (finish_time[j] >= arrival_time[j]) {
+            arrival_time[j] = finish_time[j];
+          }
+
+          finish_time[j] = obj[final_sequence[i]][j] + arrival_time[j];
+
+        } else {
+          if (finish_time[j] >= arrival_time[j]) {
+            arrival_time[j] = finish_time[j];
+          }
+
+          finish_time[j] = obj[final_sequence[i]][j] + arrival_time[j];
+          arrival_time[j + 1] = finish_time[j];
+        }
+
+        // console.log("Cycle J: " + j);
+        //
+        // console.log("AT 1: " + arrival_time_1);
+        // console.log("AT 2: " + arrival_time_2);
+        // console.log("AT 3: " + arrival_time_3);
+        // console.log("AT 4: " + arrival_time_4);
+        // console.log("AT 5: " + arrival_time_5);
+        //
+        // console.log("FT 1: " + finish_time_1);
+        // console.log("FT 2: " + finish_time_2);
+        // console.log("FT 3: " + finish_time_3);
+        // console.log("FT 4: " + finish_time_4);
+        // console.log("FT 5: " + finish_time_5);
+      }
+    }
+    return finish_time[finish_time.length - 1];
+
+  }
+</script>
+
+</html>
